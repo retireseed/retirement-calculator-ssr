@@ -1,0 +1,1019 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  Typography, Box, Card, CardContent, 
+  Accordion, AccordionSummary, AccordionDetails,
+  Fab,   AppBar,  IconButton, Slide, Toolbar,
+  TextField, InputAdornment, Tooltip, Button, Dialog,
+  DialogTitle, DialogContent, DialogActions, Table,
+  TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Paper, Select, MenuItem, FormControl, InputLabel,Alert
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
+import Slider from '@mui/material/Slider';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+
+import NavigationIcon from '@mui/icons-material/Navigation';
+import InfoIcon from '@mui/icons-material/Info';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { FormattedMessage } from 'react-intl';
+import { useDebouncedCallback } from 'use-debounce';
+import axios from 'axios';
+import { currencyOptions } from '../lib/currencyOptions';
+
+import { Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, 
+  ReferenceLine, ReferenceDot, Legend, ComposedChart, Bar } from 'recharts';
+
+
+const CustomSlider = styled(Slider)(({ theme }) => ({
+  color: theme.palette.primary.main,
+  height: 4,
+  '& .MuiSlider-track': {
+    border: 'none',
+  },
+  '& .MuiSlider-thumb': {
+    height: 14,
+    width: 14,
+    backgroundColor: '#fff',
+    border: '2px solid currentColor',
+    '&:focus, &:hover, &.Mui-active, &.Mui-focusVisible': {
+      boxShadow: 'inherit',
+    },
+    '&:before': {
+      display: 'none',
+    },
+  },
+  '& .MuiSlider-valueLabel': {
+    lineHeight: 1.2,
+    fontSize: 10,
+    background: 'unset',
+    padding: 0,
+    width: 28,
+    height: 28,
+    borderRadius: '50% 50% 50% 0',
+    backgroundColor: theme.palette.primary.main,
+    transformOrigin: 'bottom left',
+    transform: 'translate(50%, -100%) rotate(-45deg) scale(0)',
+    '&:before': { display: 'none' },
+    '&.MuiSlider-valueLabelOpen': {
+      transform: 'translate(50%, -100%) rotate(-45deg) scale(1)',
+    },
+    '& > *': {
+      transform: 'rotate(45deg)',
+    },
+  },
+}));
+
+const SliderComponent = ({ label, value, onChange, onChangeCommitted, min, max, step = 1, tooltipText, formatValue, allowInput = false, currency, sx }) => {
+  const [inputValue, setInputValue] = useState(value.toString());
+  const currencySymbol = currencyOptions.find(option => option.value === currency)?.symbol || '$';
+
+  const handleSliderChange = (event, newValue) => {
+    onChange(event, newValue);
+    setInputValue(newValue.toString());
+  };
+
+  const handleInputChange = (event) => {
+    setInputValue(event.target.value);
+  };
+
+  const handleInputBlur = () => {
+    const newValue = Number(inputValue);
+    if (!isNaN(newValue) && newValue >= min && newValue <= max) {
+      onChange(null, newValue);
+      onChangeCommitted(null, newValue);
+    } else {
+      setInputValue(value.toString());
+    }
+  };
+
+  return (
+    <Box sx={{ marginBottom: 2.5, ...sx }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0.5 }}>
+        <Typography variant="caption">
+          {label}
+          {tooltipText && (
+            <Tooltip title={tooltipText}>
+              <IconButton size="small" sx={{ padding: 0, marginLeft: 0.5 }}>
+                <InfoIcon fontSize="inherit" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Typography>
+        {allowInput ? (
+          <TextField
+            value={inputValue}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            size="small"
+            sx={{ width: '100px' }}
+            InputProps={{
+              startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
+            }}
+          />
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            {formatValue(value)}
+          </Typography>
+        )}
+      </Box>
+      <CustomSlider
+        size="small"
+        value={typeof value === 'number' ? value : 0}
+        onChange={handleSliderChange}
+        onChangeCommitted={onChangeCommitted}
+        valueLabelDisplay="auto"
+        min={min}
+        max={max}
+        step={step}
+      />
+    </Box>
+  );
+};
+
+const PanelComponent = ({ title, value, description, color, isNumber = false, formatValue }) => (
+  <Card sx={{ flexGrow: 1 }}>
+    <CardContent sx={{ textAlign: 'center' }}>
+      <Typography variant="h6" color={color}>
+        {isNumber 
+          ? Math.abs(Math.round(value)).toLocaleString()
+          : formatValue(Math.abs(value))}
+      </Typography>
+      <Typography variant="body2">{title}</Typography>
+      <Typography variant="caption">{description}</Typography>
+    </CardContent>
+  </Card>
+);
+
+const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatCurrency, oneOffExpenses, peakCorpus, peakCorpusAge }) => {
+  const generateTicks = () => {
+    let ticks = [currentAge, ageOfRetirement, ageOfDeath];
+    oneOffExpenses.forEach(expense => {
+      if (!ticks.includes(expense.age)) {
+        ticks.push(expense.age);
+      }
+    });
+    return ticks.sort((a, b) => a - b);
+  };
+
+  return (
+    <ResponsiveContainer width="100%" height={350}>
+      <ComposedChart 
+        data={data} 
+        margin={{ top: 20, right: 30, left: 0, bottom: 30 }}
+      >
+        <XAxis 
+          dataKey="year" 
+          tick={{ fontFamily: 'Roboto', fontSize: 12 }}
+          tickLine={false}
+          ticks={generateTicks()}
+          padding={{ left: 0, right: 0 }}
+          axisLine={{ strokeWidth: 1 }}
+        />
+        <YAxis 
+          tick={{ fontFamily: 'Roboto', fontSize: 12 }}
+          tickFormatter={(value) => formatCurrency(value)}
+          axisLine={false}
+          tickLine={false}
+        />
+        <ChartTooltip 
+          formatter={(value) => formatCurrency(value)}
+          contentStyle={{ fontFamily: 'Roboto', fontSize: 12 }}
+        />
+        <Legend 
+          verticalAlign="bottom"
+          align="center"
+          wrapperStyle={{
+            fontFamily: 'Roboto',
+            fontSize: 12,
+            paddingTop: 10,
+            position: 'relative',
+            marginTop: '-25px',
+          }}
+          iconSize={12}
+          iconType="circle"
+        />
+        <Bar dataKey="oneOffExpense" fill="#ff6b6b" name="One-off Expense" />
+        <Bar dataKey="removedExpense" fill="#4ecdc4" name="Removed Expense" />
+        <Line type="monotone" dataKey="totalCorpus" stroke="#0D5D56" strokeWidth={2} dot={false} name="Total Corpus" />
+        <Line type="monotone" dataKey="annualExpenses" stroke="#dc004e" strokeWidth={2} dot={false} name="Annual Expenses" />
+        
+        <ReferenceLine
+          x={peakCorpusAge}
+          stroke="#0D5D56"
+          strokeWidth={1.5}
+          strokeDasharray="5 5"
+          label={{
+            value: `Peak: ${formatCurrency(peakCorpus)}`,
+            position: 'top',
+            fill: '#0D5D56',
+            fontSize: 14,
+            fontFamily: 'Roboto',
+          }}
+        />
+        
+        <ReferenceDot
+          x={peakCorpusAge}
+          y={peakCorpus}
+          r={5}
+          fill="#0D5D56"
+          stroke="#FFFFFF"
+          strokeWidth={1.5}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+};
+
+const MobileRetirementCalculator = () => {
+ 
+  //const theme = useTheme();
+  const [activeAccordion, setActiveAccordion] = useState('step1');
+ 
+  const [showFab, setShowFab] = useState(false);
+
+  // State variables
+  const [currentAge, setCurrentAge] = useState(30);
+  const [annualExpenses, setAnnualExpenses] = useState(50000);
+  const [ageOfRetirement, setAgeOfRetirement] = useState(65);
+  const [ageOfDeath, setAgeOfDeath] = useState(85);
+  const [estimatedInflationRate, setEstimatedInflationRate] = useState(2);
+  const [annualInvestment, setAnnualInvestment] = useState(10000);
+  const [returnOnInvestment, setReturnOnInvestment] = useState(7);
+  const [currentInvestmentValue, setCurrentInvestmentValue] = useState(0);
+
+  const [surplusCash, setSurplusCash] = useState(0);
+  const [additionalYears, setAdditionalYears] = useState(0);
+  const [peakCorpus, setPeakCorpus] = useState(0);
+  const [peakCorpusAge, setPeakCorpusAge] = useState(0);
+  const [isOnTrack, setIsOnTrack] = useState(true);
+  const [graphData, setGraphData] = useState([]);
+
+  const [currency, setCurrency] = useState('GBP');
+  const [locale, setLocale] = useState('en-GB');
+  const [language, setLanguage] = useState('en');
+  const [userIpAddress, setUserIpAddress] = useState('');
+
+  const [oneOffExpenses, setOneOffExpenses] = useState([]);
+  const [openExpenseDialog, setOpenExpenseDialog] = useState(false);
+  const [newExpense, setNewExpense] = useState({ age: currentAge, amount: '', category: '', type: 'oneOff' });
+
+  const [incomes, setIncomes] = useState([]);
+  const [openIncomeDialog, setOpenIncomeDialog] = useState(false);
+  const [newIncome, setNewIncome] = useState({
+    age: ageOfRetirement,
+    amount: '',
+    incrementRate: 0,
+    type: 'pension',
+    subtype: ''
+  });
+
+  const handleCurrencyChange = (event) => {
+    const selectedCurrency = event.target.value;
+    const currencyOption = currencyOptions.find(option => option.value === selectedCurrency);
+    setCurrency(selectedCurrency);
+    setLocale(currencyOption.locale);
+  };
+
+  useEffect(() => {
+    const detectLocale = () => {
+      const userLocale = navigator.language || 'en-GB';
+      setLocale(userLocale);
+
+      const currencyMap = {
+        'en-US': 'USD',
+        'en-GB': 'GBP',
+        'de-DE': 'EUR',
+        'ja-JP': 'JPY',
+        'es-ES': 'EUR',
+        'fr-FR': 'EUR',
+        'hi-IN': 'INR',
+      };
+
+      setCurrency(currencyMap[userLocale] || 'GBP');
+
+      const languageMap = {
+        'en': 'en',
+        'es': 'es',
+        'fr': 'fr',
+        'de': 'de',
+        'hi': 'hi',
+      };
+      setLanguage(languageMap[userLocale.split('-')[0]] || 'en');
+    };
+
+    detectLocale();
+  }, []);
+
+  useEffect(() => {
+    const fetchIpAddress = async () => {
+      try {
+        const response = await axios.get('https://api.ipify.org?format=json');
+        setUserIpAddress(response.data.ip);
+      } catch (error) {
+        console.error('Error fetching IP address:', error);
+      }
+    };
+
+    fetchIpAddress();
+  }, []);
+
+  const calculateRetirement = useCallback((expenses = oneOffExpenses, incomeSources = incomes) => {
+    if (ageOfDeath <= currentAge) {
+      setGraphData([]);
+      setPeakCorpus(0);
+      setPeakCorpusAge(currentAge);
+      setSurplusCash(0);
+      setAdditionalYears(0);
+      setIsOnTrack(false);
+      return;
+    }
+
+    let totalCorpus = currentInvestmentValue;
+    let yearsInRetirement = Math.max(0, ageOfDeath - ageOfRetirement);
+    let yearsToRetirement = Math.max(0, ageOfRetirement - currentAge);
+    let inflationAdjustedExpenses = annualExpenses;
+    let data = [];
+    let maxCorpus = totalCorpus;
+    let maxCorpusAge = currentAge;
+    let shortfall = 0;
+    let yearsShort = 0;
+
+    for (let i = 0; i <= yearsToRetirement + yearsInRetirement; i++) {
+      let currentAgeInLoop = currentAge + i;
+      
+      const oneOffExpense = expenses.find(expense => expense.age === currentAgeInLoop && expense.type === 'oneOff');
+      const removedExpense = expenses.find(expense => expense.age === currentAgeInLoop && expense.type === 'recurring');
+      
+      if (oneOffExpense) {
+        totalCorpus -= parseFloat(oneOffExpense.amount);
+      }
+      
+      const recurringExpenses = expenses.filter(expense => expense.age <= currentAgeInLoop && expense.type === 'recurring');
+      const totalRecurringExpenses = recurringExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount), 0);
+      
+      const yearlyIncome = incomeSources.reduce((sum, income) => {
+        if (currentAgeInLoop >= income.age) {
+          const yearsReceivingIncome = currentAgeInLoop - income.age;
+          const incrementFactor = Math.pow(1 + income.incrementRate / 100, yearsReceivingIncome);
+          return sum + (income.amount * incrementFactor);
+        }
+        return sum;
+      }, 0);
+
+      if (i <= yearsToRetirement) {
+        totalCorpus += annualInvestment;
+        totalCorpus *= (1 + returnOnInvestment / 100);
+        totalCorpus += yearlyIncome;
+      } else {
+        totalCorpus -= (inflationAdjustedExpenses - totalRecurringExpenses);
+        totalCorpus += yearlyIncome;
+        totalCorpus *= (1 + returnOnInvestment / 100);
+        
+        if (totalCorpus < 0 && yearsShort === 0) {
+          yearsShort = ageOfDeath - currentAgeInLoop;
+        }
+      }
+      
+      if (totalCorpus > maxCorpus) {
+        maxCorpus = totalCorpus;
+        maxCorpusAge = currentAgeInLoop;
+      }
+
+      inflationAdjustedExpenses *= (1 + estimatedInflationRate / 100);
+      data.push({ 
+        year: currentAgeInLoop, 
+        totalCorpus: Math.max(0, totalCorpus),
+        annualExpenses: inflationAdjustedExpenses,
+        oneOffExpense: oneOffExpense ? parseFloat(oneOffExpense.amount) : 0,
+        removedExpense: removedExpense ? parseFloat(removedExpense.amount) : 0,
+        yearlyIncome: yearlyIncome
+      });
+    }
+
+    setGraphData(data.map(item => ({
+      ...item,
+      totalCorpus: Math.round(item.totalCorpus),
+      annualExpenses: Math.round(item.annualExpenses),
+      oneOffExpense: Math.round(item.oneOffExpense),
+      removedExpense: Math.round(item.removedExpense),
+      yearlyIncome: Math.round(item.yearlyIncome)
+    })));
+    setPeakCorpus(maxCorpus);
+    setPeakCorpusAge(maxCorpusAge);
+
+    let finalCorpus = data[data.length - 1].totalCorpus;
+    let finalExpenses = data[data.length - 1].annualExpenses;
+
+    if (finalCorpus > 0) {
+      setSurplusCash(finalCorpus);
+      setAdditionalYears(Math.floor(finalCorpus / finalExpenses));
+      setIsOnTrack(true);
+    } else {
+      let remainingYears = ageOfDeath - (ageOfRetirement + yearsInRetirement - yearsShort);
+      shortfall = finalExpenses * remainingYears;
+      setSurplusCash(-shortfall);
+      setAdditionalYears(-yearsShort);
+      setIsOnTrack(false);
+    }
+  }, [currentAge, ageOfRetirement, ageOfDeath, annualExpenses, estimatedInflationRate, annualInvestment, returnOnInvestment, currentInvestmentValue, oneOffExpenses, incomes]);
+
+  useEffect(() => {
+    calculateRetirement();
+  }, [calculateRetirement]);
+
+  const formatCurrency = (value) => {
+    if (currency === 'INR') {
+      if (value >= 10000000) {
+        const crore = value / 10000000;
+        return `₹${crore.toFixed(2)} Cr`;
+      } else if (value >= 100000) {
+        const lakh = value / 100000;
+        return `₹${lakh.toFixed(2)} L`;
+      }
+    }
+    
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency,
+      notation: 'compact',
+      compactDisplay: 'short',
+    }).format(value);
+  };
+
+  const handleSliderChange = (setter) => (_, newValue) => {
+    setter(newValue);
+  };
+
+  const handleSliderChangeCommitted = (setter) => (_, newValue) => {
+    setter(newValue);
+    debouncedSaveCalculation();
+  };
+
+  const debouncedSaveCalculation = useDebouncedCallback(
+    () => {
+      calculateRetirement();
+      saveCalculation();
+    },
+    500
+  );
+
+  const handleAddExpense = () => {
+    if (newExpense.age && parseFloat(newExpense.amount) > 0 && newExpense.category && newExpense.type) {
+      const updatedExpense = {
+        ...newExpense,
+        amount: parseFloat(newExpense.amount),
+        action: newExpense.type === 'oneOff' ? 'Add' : 'Remove'
+      };
+
+      setOneOffExpenses(prevExpenses => {
+        const updatedExpenses = [...prevExpenses, updatedExpense];
+        calculateRetirement(updatedExpenses);
+        saveCalculation(updatedExpenses);
+        return updatedExpenses;
+      });
+
+      setOpenExpenseDialog(false);
+      setNewExpense({ age: currentAge, amount: '', category: '', type: 'oneOff' });
+    } else {
+      alert('Please fill in all fields and ensure the amount is greater than 0.');
+    }
+  };
+
+  const handleDeleteExpense = (index) => {
+    setOneOffExpenses(prevExpenses => {
+      const updatedExpenses = prevExpenses.filter((_, i) => i !== index);
+      calculateRetirement(updatedExpenses);
+      return updatedExpenses;
+    });
+  };
+
+  const handleAddIncome = () => {
+    if (newIncome.age && parseFloat(newIncome.amount) > 0 && newIncome.subtype && newIncome.type) {
+      const updatedIncome = {
+        ...newIncome,
+        amount: parseFloat(newIncome.amount)
+      };
+
+      setIncomes(prevIncomes => {
+        const updatedIncomes = [...prevIncomes, updatedIncome];
+        calculateRetirement(undefined, updatedIncomes);
+        saveCalculation(undefined, updatedIncomes);
+        return updatedIncomes;
+      });
+
+      setOpenIncomeDialog(false);
+      setNewIncome({ age: ageOfRetirement, amount: '', incrementRate: 0, type: 'pension', subtype: '' });
+    } else {
+      alert('Please fill in all fields and ensure the amount is greater than 0.');
+    }
+  };
+
+  const handleDeleteIncome = (index) => {
+    setIncomes(prevIncomes => {
+      const updatedIncomes = prevIncomes.filter((_, i) => i !== index);
+      calculateRetirement(undefined, updatedIncomes);
+      return updatedIncomes;
+    });
+  };
+
+  async function saveCalculation(expenses, incomes) {
+    try {
+      const response = await fetch('/api/save-calculation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentAge,
+          annualExpenses,
+          ageOfRetirement,
+          ageOfDeath,
+          estimatedInflationRate,
+          annualInvestment,
+          returnOnInvestment,
+          currentInvestmentValue,
+          surplusCash,
+          additionalYears,
+          peakCorpus,
+          peakCorpusAge,
+          isOnTrack,
+          currency,
+          locale,
+          language,
+          ipAddress: userIpAddress,
+          expenses: expenses || [],
+          incomes: incomes || [],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Calculation saved:', data);
+    } catch (error) {
+      console.error('Error saving calculation:', error.message);
+    }
+  }
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowFab(window.scrollY > 100);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleAccordionChange = (panel) => (event, isExpanded) => {
+    setActiveAccordion(isExpanded ? panel : false);
+  };
+
+
+
+  return (
+    <Box sx={{ pb: 7 }}>
+          <AppBar position="sticky">
+        
+      </AppBar>
+    <Box sx={{ p: 2 }}>
+    <Typography variant="h5" align="center" gutterBottom>
+          <FormattedMessage id="title" />
+        </Typography>
+
+        <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            <FormattedMessage id="introducingTheApp" defaultMessage="Introducing the Retirement Calculator App" />
+          </Typography>
+          <Typography variant="body2">
+            <FormattedMessage 
+              id="appDescription"
+              defaultMessage="The new Retirement Calculator app is designed to simplify the process of retirement planning. With a user-friendly interface, it allows you to input key details like your current age, annual expenses, retirement age, and expected return on investments. The app then calculates essential metrics such as your peak corpus value, the surplus beyond your life expectancy, and how many extra years your corpus will last. This instant feedback helps you understand whether you are on track to meet your retirement goals or if adjustments are needed."
+            />
+          </Typography>
+        </Paper>
+
+      <Alert 
+        severity="info" 
+        icon={<InfoIcon fontSize="inherit" />}
+        sx={{ mb: 2, '& .MuiAlert-message': { width: '100%' } }}
+      >
+        <Typography variant="body2">
+          <FormattedMessage 
+            id="adjustFiltersMessage" 
+            defaultMessage="Adjust the filters in each step below to calculate your retirement plan. Your results will update automatically."
+          />
+        </Typography>
+      </Alert>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 70 }}>
+            <Select
+              value={currency}
+              onChange={handleCurrencyChange}
+              displayEmpty
+              inputProps={{ 'aria-label': 'Select currency' }}
+            >
+              {currencyOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.symbol}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+
+      <Accordion expanded={activeAccordion === 'step1'} onChange={handleAccordionChange('step1')}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography><FormattedMessage id="step1Profile" defaultMessage="Step 1: Profile" /></Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <SliderComponent
+            label={<FormattedMessage id="currentAge" />}
+            value={currentAge}
+            onChange={handleSliderChange(setCurrentAge)}
+            onChangeCommitted={handleSliderChangeCommitted(setCurrentAge)}
+            min={1}
+            max={120}
+            tooltipText={<FormattedMessage id="currentAgeTooltip" />}
+            formatValue={(value) => value.toLocaleString()}
+          />
+          <SliderComponent
+            label={<FormattedMessage id="ageOfRetirement" />}
+            value={ageOfRetirement}
+            onChange={handleSliderChange(setAgeOfRetirement)}
+            onChangeCommitted={handleSliderChangeCommitted(setAgeOfRetirement)}
+            min={1}
+            max={120}
+            tooltipText={<FormattedMessage id="ageOfRetirementTooltip" />}
+            formatValue={(value) => value.toLocaleString()}
+          />
+          <SliderComponent
+            label={<FormattedMessage id="ageOfDeath" />}
+            value={ageOfDeath}
+            onChange={handleSliderChange(setAgeOfDeath)}
+            onChangeCommitted={handleSliderChangeCommitted(setAgeOfDeath)}
+            min={1}
+            max={120}
+            tooltipText={<FormattedMessage id="ageOfDeathTooltip" />}
+            formatValue={(value) => value.toLocaleString()}
+          />
+        </AccordionDetails>
+      </Accordion>
+
+      <Accordion expanded={activeAccordion === 'step2'} onChange={handleAccordionChange('step2')}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography><FormattedMessage id="step2Expenses" defaultMessage="Step 2: Expenses" /></Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <SliderComponent
+            label={<FormattedMessage id="annualExpenses" />}
+            value={annualExpenses}
+            onChange={handleSliderChange(setAnnualExpenses)}
+            onChangeCommitted={handleSliderChangeCommitted(setAnnualExpenses)}
+            min={0}
+            max={10000000}
+            step={1000}
+            tooltipText={<FormattedMessage id="annualExpensesTooltip" />}
+            formatValue={formatCurrency}
+            allowInput={true}
+            currency={currency}
+          />
+          <SliderComponent
+            label={<FormattedMessage id="estimatedInflationRate" />}
+            value={estimatedInflationRate}
+            onChange={handleSliderChange(setEstimatedInflationRate)}
+            onChangeCommitted={handleSliderChangeCommitted(setEstimatedInflationRate)}
+            min={1}
+            max={20}
+            step={0.1}
+            tooltipText={<FormattedMessage id="estimatedInflationRateTooltip" />}
+            formatValue={(value) => `${value.toFixed(1)}%`}
+          />
+          <Button variant="outlined" onClick={() => setOpenExpenseDialog(true)} size="small" sx={{ mb: 2 }}>
+            <FormattedMessage id="manageExpenses" />
+          </Button>
+          
+          {oneOffExpenses.length > 0 && (
+            <TableContainer component={Paper} sx={{ mb: 2 }}>
+              <Table size="small" aria-label="expenses table">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><FormattedMessage id="age" /></TableCell>
+                    <TableCell><FormattedMessage id="amount" /></TableCell>
+                    <TableCell><FormattedMessage id="category" /></TableCell>
+                    <TableCell><FormattedMessage id="type" /></TableCell>
+                    <TableCell><FormattedMessage id="actions" /></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {oneOffExpenses.map((expense, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{expense.age}</TableCell>
+                      <TableCell>{formatCurrency(expense.amount)}</TableCell>
+                      <TableCell>{expense.category}</TableCell>
+                      <TableCell>
+                        <FormattedMessage id={expense.type === 'oneOff' ? 'oneOffExpense' : 'regularExpense'} />
+                      </TableCell>
+                      <TableCell>
+                        <IconButton onClick={() => handleDeleteExpense(index)} size="small">
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </AccordionDetails>
+      </Accordion>
+
+      <Accordion expanded={activeAccordion === 'step3'} onChange={handleAccordionChange('step3')}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography><FormattedMessage id="step3Investments" defaultMessage="Step 3: Investments" /></Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <SliderComponent
+            label={<FormattedMessage id="currentInvestmentValue" />}
+            value={currentInvestmentValue}
+            onChange={handleSliderChange(setCurrentInvestmentValue)}
+            onChangeCommitted={handleSliderChangeCommitted(setCurrentInvestmentValue)}
+            min={0}
+            max={100000000}
+            step={1000}
+            tooltipText={<FormattedMessage id="currentInvestmentValueTooltip" />}
+            formatValue={formatCurrency}
+            allowInput={true}
+            currency={currency}
+          />
+          <SliderComponent
+            label={<FormattedMessage id="annualInvestmentUntilRetirement" />}
+            value={annualInvestment}
+            onChange={handleSliderChange(setAnnualInvestment)}
+            onChangeCommitted={handleSliderChangeCommitted(setAnnualInvestment)}
+            min={0}
+            max={1000000}
+            step={1000}
+            tooltipText={<FormattedMessage id="annualInvestmentUntilRetirementTooltip" />}
+            formatValue={formatCurrency}
+            allowInput={true}
+            currency={currency}
+          />
+          <SliderComponent
+            label={<FormattedMessage id="returnOnInvestment" />}
+            value={returnOnInvestment}
+            onChange={handleSliderChange(setReturnOnInvestment)}
+            onChangeCommitted={handleSliderChangeCommitted(setReturnOnInvestment)}
+            min={1}
+            max={30}
+            step={0.1}
+            tooltipText={<FormattedMessage id="returnOnInvestmentTooltip" />}
+            formatValue={(value) => `${value.toFixed(1)}%`}
+          />
+        </AccordionDetails>
+      </Accordion>
+
+      <Accordion expanded={activeAccordion === 'step4'} onChange={handleAccordionChange('step4')}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography><FormattedMessage id="step4Income" defaultMessage="Step 4: Income" /></Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Button variant="outlined" onClick={() => setOpenIncomeDialog(true)} size="small" sx={{ mb: 2 }}>
+            <FormattedMessage id="addRetirementIncome" />
+          </Button>
+          
+          {incomes.length > 0 && (
+            <TableContainer component={Paper} sx={{ mb: 2 }}>
+              <Table size="small" aria-label="income table">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><FormattedMessage id="age" /></TableCell>
+                    <TableCell><FormattedMessage id="amount" /></TableCell>
+                    <TableCell><FormattedMessage id="incomeType" /></TableCell>
+                    <TableCell><FormattedMessage id="incomeSubtype" /></TableCell>
+                    <TableCell><FormattedMessage id="incomeIncrementRate" /></TableCell>
+                    <TableCell><FormattedMessage id="actions" /></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {incomes.map((income, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{income.age}</TableCell>
+                      <TableCell>{formatCurrency(income.amount)}</TableCell>
+                      <TableCell><FormattedMessage id={income.type} /></TableCell>
+                      <TableCell>{income.subtype}</TableCell>
+                      <TableCell>{`${income.incrementRate}%`}</TableCell>
+                      <TableCell>
+                        <IconButton onClick={() => handleDeleteIncome(index)} size="small">
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </AccordionDetails>
+      </Accordion>
+
+      <Card sx={{ mt: 2 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', gap: 2, marginBottom: 2, flexWrap: 'wrap' }}>
+            <PanelComponent
+              title={
+                <FormattedMessage 
+                  id={isOnTrack ? "monthlyInvestmentUntilRetirement" : "insufficientMonthlyInvestment"}
+                />
+              }
+              value={Math.round(annualInvestment / 12)}
+              description=""
+              color={isOnTrack ? "primary.main" : "error.main"}
+              formatValue={formatCurrency}
+            />
+            <PanelComponent
+              title={<FormattedMessage id={isOnTrack ? "surplusBeyondLifeExpectancy" : "corpusShortfall"} />}
+              value={Math.abs(surplusCash)}
+              description=""
+              color={isOnTrack ? "success.main" : "error.main"}
+              formatValue={formatCurrency}
+            />
+            <PanelComponent
+              title={<FormattedMessage id={isOnTrack ? "extraYearsCorpusWillLast" : "yearsShortOnCorpus"} />}
+              value={Math.abs(additionalYears)}
+              description=""
+              color={isOnTrack ? "success.main" : "error.main"}
+              isNumber={true}
+              formatValue={(value) => value.toLocaleString()}
+            />
+          </Box>
+
+          <Typography variant="body1" color={isOnTrack ? "success.main" : "error.main"} align="center">
+            <FormattedMessage id={isOnTrack ? "onTrackMessage" : "notOnTrackMessage"} />
+          </Typography>
+
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" gutterBottom color="primary" align="center">
+              <FormattedMessage id="corpusGrowthDecline" />
+            </Typography>
+            {graphData.length > 0 && (
+              <GraphComponent 
+                data={graphData} 
+                currentAge={currentAge}
+                ageOfRetirement={ageOfRetirement}
+                ageOfDeath={ageOfDeath}
+                formatCurrency={formatCurrency}
+                oneOffExpenses={oneOffExpenses}
+                peakCorpus={peakCorpus}
+                peakCorpusAge={peakCorpusAge}
+              />
+            )}
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
+    
+
+      <Slide direction="up" in={showFab}>
+        <Fab 
+          color="primary" 
+          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
+          <NavigationIcon />
+        </Fab>
+      </Slide>
+
+      {/* Expense Dialog */}
+      <Dialog open={openExpenseDialog} onClose={() => setOpenExpenseDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle><FormattedMessage id="manageExpenses" /></DialogTitle>
+        <DialogContent>
+          <Typography variant="caption" sx={{ display: 'block', mb: 2 }}>
+            <FormattedMessage id="manageExpensesDescription" />
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <SliderComponent
+              label={<FormattedMessage id="age" />}
+              value={newExpense.age}
+              onChange={(_, newValue) => setNewExpense({...newExpense, age: newValue})}
+              min={currentAge}
+              max={ageOfDeath}
+              step={1}
+              formatValue={(value) => value.toLocaleString()}
+            />
+            <TextField
+              label={<FormattedMessage id="expenseAmount" />}
+              value={newExpense.amount}
+              onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+              type="number"
+              fullWidth
+              InputProps={{
+                startAdornment: <InputAdornment position="start">{currencyOptions.find(option => option.value === currency)?.symbol}</InputAdornment>,
+              }}
+            />
+            <FormControl fullWidth>
+              <InputLabel><FormattedMessage id="expenseCategory" /></InputLabel>
+              <Select
+                value={newExpense.category}
+                onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+                label={<FormattedMessage id="expenseCategory" />}
+              >
+                <MenuItem value="Wedding"><FormattedMessage id="wedding" /></MenuItem>
+                <MenuItem value="Education"><FormattedMessage id="education" /></MenuItem>
+                <MenuItem value="Travel"><FormattedMessage id="travel" /></MenuItem>
+                <MenuItem value="Other"><FormattedMessage id="other" /></MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel><FormattedMessage id="expenseType" /></InputLabel>
+              <Select
+                value={newExpense.type}
+                onChange={(e) => setNewExpense({...newExpense, type: e.target.value})}
+                label={<FormattedMessage id="expenseType" />}
+              >
+                <MenuItem value="oneOff"><FormattedMessage id="oneOffExpense" /></MenuItem>
+                <MenuItem value="recurring"><FormattedMessage id="regularExpense" /></MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenExpenseDialog(false)}><FormattedMessage id="cancel" /></Button>
+          <Button onClick={handleAddExpense}><FormattedMessage id="add" /></Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Income Dialog */}
+      <Dialog open={openIncomeDialog} onClose={() => setOpenIncomeDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle><FormattedMessage id="addRetirementIncome" /></DialogTitle>
+        <DialogContent>
+          <Typography variant="caption" sx={{ display: 'block', mb: 2 }}>
+            <FormattedMessage id="addRetirementIncomeDescription" />
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <SliderComponent
+              label={<FormattedMessage id="age" />}
+              value={newIncome.age}
+              onChange={(_, newValue) => setNewIncome({...newIncome, age: newValue})}
+              min={ageOfRetirement}
+              max={ageOfDeath}
+              step={1}
+              formatValue={(value) => value.toLocaleString()}
+            />
+            <TextField
+              label={<FormattedMessage id="incomeAmount" />}
+              value={newIncome.amount}
+              onChange={(e) => setNewIncome({...newIncome, amount: e.target.value})}
+              type="number"
+              fullWidth
+              InputProps={{
+                startAdornment: <InputAdornment position="start">{currencyOptions.find(option => option.value === currency)?.symbol}</InputAdornment>,
+              }}
+            />
+            <SliderComponent
+              label={<FormattedMessage id="incomeIncrementRate" />}
+              value={newIncome.incrementRate}
+              onChange={(_, newValue) => setNewIncome({...newIncome, incrementRate: newValue})}
+              min={0}
+              max={20}
+              step={0.1}
+              formatValue={(value) => `${value.toFixed(1)}%`}
+            />
+            <FormControl fullWidth>
+              <InputLabel><FormattedMessage id="incomeType" /></InputLabel>
+              <Select
+                value={newIncome.type}
+                onChange={(e) => setNewIncome({...newIncome, type: e.target.value})}
+                label={<FormattedMessage id="incomeType" />}
+              >
+                <MenuItem value="pension"><FormattedMessage id="pension" /></MenuItem>
+                <MenuItem value="passive"><FormattedMessage id="passive" /></MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel><FormattedMessage id="incomeSubtype" /></InputLabel>
+              <Select
+                value={newIncome.subtype}
+                onChange={(e) => setNewIncome({...newIncome, subtype: e.target.value})}
+                label={<FormattedMessage id="incomeSubtype" />}
+              >
+                <MenuItem value="Rental"><FormattedMessage id="rental" /></MenuItem>
+                <MenuItem value="Dividends"><FormattedMessage id="dividends" /></MenuItem>
+                <MenuItem value="Pension"><FormattedMessage id="pension" /></MenuItem>
+                <MenuItem value="Other"><FormattedMessage id="other" /></MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenIncomeDialog(false)}><FormattedMessage id="cancel" /></Button>
+          <Button onClick={handleAddIncome}><FormattedMessage id="add" /></Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default MobileRetirementCalculator;
