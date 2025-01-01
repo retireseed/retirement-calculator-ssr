@@ -54,7 +54,12 @@ const ExpensesStep = ({ annualExpenses, estimatedInflationRate, oneOffExpenses, 
         formatValue={(value) => `${value.toFixed(1)}%`}
         tooltipText={<FormattedMessage id="estimatedInflationRateTooltip" />}
       />
-      <Button variant="outlined" size="small" sx={{ mt: 2 }} onClick={handleOpenExpenseDialog}>
+
+      <Typography variant="body2" sx={{ mt: 2 }}>
+        <FormattedMessage id="addOrRemoveOneOffExpenses" defaultMessage="Include One-Time Expenses (e.g., Children's Education) and Remove Recurring Ones (e.g., Mortgage)." />
+      </Typography>
+
+      <Button variant="outlined" size="small" sx={{ mt: 1 }} onClick={handleOpenExpenseDialog}>
         <FormattedMessage id="manageExpenses" />
       </Button>
 
