@@ -111,6 +111,8 @@ export default function RetirementCalculator() {
     let yearsInRetirement = Math.max(0, ageOfDeath - ageOfRetirement);
     let yearsToRetirement = Math.max(0, ageOfRetirement - currentAge);
     let inflationAdjustedExpenses = annualExpenses;
+    let removedRecurringExpenses = 0; // Track total removed expenses
+    let finalAdjustedAnnualExpenses = annualExpenses; // Add this to track final value
     let corpusAtRetirement = 0;
     let data = [];
     let maxCorpus = totalCorpus;
@@ -127,12 +129,24 @@ export default function RetirementCalculator() {
     for (let i = 0; i <= yearsToRetirement + yearsInRetirement; i++) {
       let currentAgeInLoop = currentAge + i;
       
-      const oneOffExpense = oneOffExpenses.find(expense => expense.age === currentAgeInLoop && expense.type === 'oneOff');
-      const removedExpense = oneOffExpenses.find(expense => expense.age === currentAgeInLoop && expense.type === 'recurring');
-      
+      const oneOffExpense = oneOffExpenses.find(expense => 
+          expense.age === currentAgeInLoop && 
+          expense.type === 'oneOff'
+      );
       if (oneOffExpense) {
-        totalCorpus -= parseFloat(oneOffExpense.amount);
+          totalCorpus -= parseFloat(oneOffExpense.amount);
       }
+      
+      const newRemovedExpense = oneOffExpenses.find(expense => 
+          expense.age === currentAgeInLoop && 
+          expense.type === 'recurring'
+      );
+      if (newRemovedExpense) {
+          removedRecurringExpenses += parseFloat(newRemovedExpense.amount);
+      }
+      
+      const adjustedAnnualExpenses = inflationAdjustedExpenses - removedRecurringExpenses;
+      finalAdjustedAnnualExpenses = adjustedAnnualExpenses; // Update final value
       
       const recurringExpenses = oneOffExpenses.filter(expense => expense.age <= currentAgeInLoop && expense.type === 'recurring');
       const totalRecurringExpenses = recurringExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount), 0);
@@ -158,13 +172,13 @@ export default function RetirementCalculator() {
         if (i === yearsToRetirement) {
           corpusAtRetirement = totalCorpus;
           initialWithdrawalRate = corpusAtRetirement > 0 
-            ? (inflationAdjustedExpenses / corpusAtRetirement) * 100
+            ? (adjustedAnnualExpenses / corpusAtRetirement) * 100
             : 0;
           currentWithdrawalRate = initialWithdrawalRate;
           maxWithdrawalRate = initialWithdrawalRate;
         }
       } else {
-        let withdrawalAmount = inflationAdjustedExpenses - totalRecurringExpenses - yearlyIncome;
+        let withdrawalAmount = adjustedAnnualExpenses - totalRecurringExpenses - yearlyIncome;
         currentWithdrawalRate = totalCorpus > 0 
           ? (withdrawalAmount / totalCorpus) * 100
           : null; // Use null instead of Infinity when corpus is depleted
@@ -184,18 +198,19 @@ export default function RetirementCalculator() {
         maxCorpusAge = currentAgeInLoop;
       }
 
-      inflationAdjustedExpenses *= (1 + estimatedInflationRate / 100);
       data.push({ 
         year: currentAgeInLoop, 
         totalCorpus: Math.max(0, totalCorpus),
-        annualExpenses: inflationAdjustedExpenses,
-        oneOffExpense: oneOffExpense ? parseFloat(oneOffExpense.amount) : 0,
-        removedExpense: removedExpense ? parseFloat(removedExpense.amount) : 0,
+        annualExpenses: adjustedAnnualExpenses,
+        oneOffExpense: oneOffExpense?.amount || 0,
+        removedExpense: newRemovedExpense?.amount || 0,
         yearlyIncome: yearlyIncome,
         withdrawalRate: currentWithdrawalRate,
-        annualInvestment: i <= yearsToRetirement ? currentAnnualInvestment : 0, // Add this line
-        incomeType: yearlyIncome > 0 ? 'Income' : '-' // Add this line
+        annualInvestment: i <= yearsToRetirement ? currentAnnualInvestment : 0,
+        incomeType: yearlyIncome > 0 ? 'Income' : '-'
       });
+
+      inflationAdjustedExpenses *= (1 + estimatedInflationRate / 100);
     }
 
     const calculatedResults = {
@@ -203,7 +218,7 @@ export default function RetirementCalculator() {
       withdrawalRate: initialWithdrawalRate,
       maxWithdrawalRate,
       surplusCash: totalCorpus > 0 ? totalCorpus : -shortfall,
-      additionalYears: totalCorpus > 0 ? Math.floor(totalCorpus / inflationAdjustedExpenses) : -yearsShort,
+      additionalYears: totalCorpus > 0 ? Math.floor(totalCorpus / finalAdjustedAnnualExpenses) : -yearsShort,
       isOnTrack: totalCorpus > 0,
       peakCorpus: maxCorpus,
       peakCorpusAge: maxCorpusAge,
@@ -211,7 +226,8 @@ export default function RetirementCalculator() {
       ageOfRetirement: calculationData.ageOfRetirement,
       ageOfDeath: calculationData.ageOfDeath,
       graphData: data,
-      tableData: data // Add this line
+      tableData: data,
+      oneOffExpenses: calculationData.oneOffExpenses
     };
 
     

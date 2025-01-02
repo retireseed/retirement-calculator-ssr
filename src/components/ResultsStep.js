@@ -4,21 +4,31 @@ import { FormattedMessage } from 'react-intl';
 import { ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ReferenceDot, Area } from 'recharts';
 import CoffeeIcon from '@mui/icons-material/LocalCafe';
 import EditIcon from '@mui/icons-material/Edit';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import { useState } from 'react';
 
 const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatCurrency, oneOffExpenses, peakCorpus, peakCorpusAge }) => {
-
-
+    console.log('Graph Component Props:', { currentAge, ageOfRetirement, ageOfDeath, oneOffExpenses });
+    
     const generateTicks = () => {
-        let ticks = [currentAge, ageOfRetirement, ageOfDeath];
+        const ticks = [currentAge, ageOfRetirement, ageOfDeath];
+      
         oneOffExpenses.forEach(expense => {
-          if (!ticks.includes(expense.age)) {
-            ticks.push(expense.age);
-          }
+            if (!ticks.includes(expense.age)) {
+                ticks.push(expense.age);
+            }
         });
-        return ticks.sort((a, b) => a - b);
+        
+        const sortedTicks = ticks.sort((a, b) => a - b);
+       
+        return sortedTicks;
     };
 
-   
+    console.log('Graph Data:', data);
 
     return (
         <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -50,6 +60,8 @@ const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatC
                         tickLine={{ stroke: '#666', strokeWidth: 1 }}
                         axisLine={false}
                         label={{ value: 'Age', position: 'insideBottom', offset: -5, fill: '#666', fontFamily: 'Roboto', fontSize: 12 }}
+                        interval={0}
+                        allowDataOverflow={true}
                     />
                     <YAxis 
                         tick={false}
@@ -71,8 +83,20 @@ const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatC
                         iconSize={12}
                         iconType="circle"
                     />
-                    <Bar dataKey="oneOffExpense" fill="#ff6b6b" name="One-off Expense" />
-                    <Bar dataKey="removedExpense" fill="#4ecdc4" name="Removed Expense" />
+                    <Bar 
+                        dataKey="oneOffExpense"
+                        fill="#FF4B4B"
+                        name="One-off Expense" 
+                        barSize={20}
+                        stackId="expenses"
+                    />
+                    <Bar 
+                        dataKey="removedExpense"
+                        fill="#4CAF50"
+                        name="Removed Expense" 
+                        barSize={20}
+                        stackId="expenses"
+                    />
                     <Area
                         type="monotone"
                         dataKey="totalCorpus"
@@ -81,7 +105,14 @@ const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatC
                         stroke="none"
                         name="Total Corpus"
                     />
-                    <Line type="monotone" dataKey="annualExpenses" stroke="#dc004e" strokeWidth={1} dot={false} name="Annual Expenses" />
+                    <Line 
+                        type="monotone" 
+                        dataKey="annualExpenses" 
+                        stroke="#dc004e" 
+                        strokeWidth={1} 
+                        dot={false} 
+                        name="Annual Expenses" 
+                    />
                     <ReferenceLine
                         x={peakCorpusAge}
                         stroke="#0D5D56"
@@ -103,6 +134,12 @@ const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatC
 };
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function ResultsStep({ results, formatCurrency, currency, onEdit }) {
+  const [openDialog, setOpenDialog] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [errors, setErrors] = useState({});
+  const [sending, setSending] = useState(false);
+
   if (!results) {
     return <Typography><FormattedMessage id="noResultsAvailable" /></Typography>;
   }
@@ -119,7 +156,29 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
   // Format the maxWithdrawalRate, capping it at 100%
   const formattedMaxWithdrawalRate = maxWithdrawalRate > 100 ? '100.00' : maxWithdrawalRate.toFixed(2);
 
-  const handleDownload = () => {
+  const validateInputs = () => {
+    const newErrors = {};
+    
+    // Validate name (letters, spaces, and basic punctuation only)
+    if (!name.match(/^[a-zA-Z\s'.,-]{2,50}$/)) {
+      newErrors.name = 'Please enter a valid name (2-50 characters, no special characters)';
+    }
+
+    // Validate email
+    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    if (!email.match(emailRegex)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSendReport = async () => {
+    if (!validateInputs()) return;
+
+    setSending(true);
+    
     const headers = ['Age', 'Annual Investment', 'Total Corpus', 'Annual Expenses', 'Withdrawal Rate'];
     const csvContent = [
       headers.join(','),
@@ -132,17 +191,34 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
       ].join(','))
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', 'retirement_projections.csv');
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    try {
+      const response = await fetch('/api/send-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          csvContent,
+          ipAddress: results.ipAddress
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to send report');
+
+      setOpenDialog(false);
+      // You might want to show a success message here
+    } catch (error) {
+      console.error('Error sending report:', error);
+      // You might want to show an error message here
+    } finally {
+      setSending(false);
     }
+  };
+
+  const handleDownload = () => {
+    setOpenDialog(true);
   };
 
   return (
@@ -332,6 +408,51 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
+        <DialogTitle>Send Report to Email</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Name"
+            fullWidth
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            error={!!errors.name}
+            helperText={errors.name}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            label="Email Address"
+            type="email"
+            fullWidth
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={!!errors.email}
+            helperText={errors.email}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSendReport} 
+            disabled={sending}
+            sx={{
+              backgroundColor: '#0D5D56',
+              color: '#ffffff',
+              '&:hover': {
+                backgroundColor: '#0A4A45',
+              },
+            }}
+          >
+            {sending ? 'Sending...' : 'Send Report'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

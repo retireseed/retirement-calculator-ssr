@@ -1,4 +1,15 @@
 import { openDb } from '../../lib/db';
+import nodemailer from 'nodemailer';
+
+
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'retireseed@gmail.com',
+    pass: 'ebhv fbcd hwss yuqr' // Use App Password from Google Account
+  }
+});
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -57,6 +68,47 @@ export default async function handler(req, res) {
           VALUES (?, ?, ?, ?, ?, ?)
         `, [ipAddress, income.age, income.amount, income.incrementRate, income.type, income.subtype]);
       }
+
+      // Updated email content with all fields
+      const emailContent = `
+        New Retirement Calculation Details:
+        
+        Personal Information:
+        - IP Address: ${ipAddress}
+        - Currency: ${currency}
+        - Locale: ${locale}
+        - Language: ${language}
+        
+        Age & Timeline:
+        - Current Age: ${currentAge}
+        - Retirement Age: ${ageOfRetirement}
+        - Age of Death: ${ageOfDeath}
+        
+        Financial Details:
+        - Annual Expenses: ${currency} ${annualExpenses}
+        - Current Investment Value: ${currency} ${currentInvestmentValue}
+        - Annual Investment: ${currency} ${annualInvestment}
+        - Annual Investment Increment: ${annualInvestmentIncrement}%
+        - Return on Investment: ${returnOnInvestment}%
+        - Estimated Inflation Rate: ${estimatedInflationRate}%
+        
+        Results:
+        - Is On Track: ${isOnTrack ? 'Yes' : 'No'}
+        - Surplus Cash: ${currency} ${surplusCash}
+        - Additional Years: ${additionalYears}
+        - Peak Corpus: ${currency} ${peakCorpus}
+        - Peak Corpus Age: ${peakCorpusAge}
+        
+        Number of Expenses: ${expenses.length}
+        Number of Income Sources: ${incomes.length}
+      `;
+
+      await transporter.sendMail({
+        from: 'retireseed@gmail.com',
+        to: 'retireseed@gmail.com',
+        subject: 'New Retirement Calculation Saved',
+        text: emailContent
+      });
 
       res.status(200).json({ message: 'Calculation saved successfully', id: result.lastID });
     } catch (error) {

@@ -17,6 +17,7 @@
     "axios": "^1.7.7",
     "cors": "^2.8.5",
     "next": "latest",
+    "nodemailer": "^6.9.16",
     "react": "latest",
     "react-dom": "latest",
     "react-intl": "^6.6.8",

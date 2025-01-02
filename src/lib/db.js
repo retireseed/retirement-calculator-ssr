@@ -56,6 +56,14 @@ async function openDb() {
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
 
+      await db.run(`CREATE TABLE IF NOT EXISTS downloads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_address TEXT,
+        name TEXT,
+        email TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
     } catch (error) {
       console.error('Error opening database:', error);
       throw error;
