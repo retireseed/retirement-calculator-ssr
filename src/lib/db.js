@@ -31,7 +31,8 @@ async function openDb() {
         currency TEXT,
         locale TEXT,
         language TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        channel TEXT
       )`);
 
       await db.run(`CREATE TABLE IF NOT EXISTS expenses (

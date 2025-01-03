@@ -12,7 +12,7 @@ import TextField from '@mui/material/TextField';
 import { useState } from 'react';
 
 const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatCurrency, oneOffExpenses, peakCorpus, peakCorpusAge }) => {
-    console.log('Graph Component Props:', { currentAge, ageOfRetirement, ageOfDeath, oneOffExpenses });
+   
     
     const generateTicks = () => {
         const ticks = [currentAge, ageOfRetirement, ageOfDeath];
@@ -28,7 +28,7 @@ const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatC
         return sortedTicks;
     };
 
-    console.log('Graph Data:', data);
+    
 
     return (
         <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -210,7 +210,7 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
       setOpenDialog(false);
       // You might want to show a success message here
     } catch (error) {
-      console.error('Error sending report:', error);
+      
       // You might want to show an error message here
     } finally {
       setSending(false);
@@ -223,7 +223,7 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
 
   return (
     <Box>
-      {/* Edit Button with updated styling */}
+      {/* Edit Button */}
       <Box sx={{ mb: 4 }}>
         <Button
           fullWidth
@@ -240,14 +240,73 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
             '&:hover': {
               backgroundColor: '#0A4A45',
             },
+            mb: 2  // Add margin bottom for spacing
           }}
         >
           <FormattedMessage id="edit" />
         </Button>
+        
+        {/* Add Follow Us Button */}
+        <Button
+          fullWidth
+          variant="outlined"
+          href="https://x.com/retireseed"
+          target="_blank"
+          rel="noopener noreferrer"
+          sx={{ 
+            py: 1.5, 
+            borderRadius: 2,
+            textTransform: 'none',
+            fontSize: '1rem',
+            borderColor: '#0D5D56',
+            color: '#0D5D56',
+            '&:hover': {
+              borderColor: '#0A4A45',
+              backgroundColor: 'rgba(13, 93, 86, 0.04)',
+            },
+          }}
+        >
+          <FormattedMessage id="followUsOnX" defaultMessage="Follow Us on X" />
+        </Button>
+      </Box>
+
+      {/* New Navigation Links */}
+      <Box sx={{ 
+        mb: 4, 
+        display: { xs: 'flex', md: 'none' }, // Only show on mobile
+        flexDirection: 'column',
+        gap: 0.5
+      }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+          <FormattedMessage id="quickNavigation" defaultMessage="Quick Navigation" />
+        </Typography>
+        {[
+          { id: 'summary', icon: '📊', message: 'Summary' },
+          { id: 'corpusProjection', icon: '📈', message: 'Corpus Projection' },
+          { id: 'detailedReport', icon: '📋', message: 'Detailed Projection Report' },
+          { id: 'support', icon: '☕', message: 'Support the Developer' }
+        ].map((item) => (
+          <Button
+            key={item.id}
+            variant="text"
+            fullWidth
+            onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
+            sx={{
+              justifyContent: 'flex-start',
+              color: '#0D5D56',
+              textTransform: 'none',
+              '&:hover': {
+                backgroundColor: 'rgba(13, 93, 86, 0.04)',
+              }
+            }}
+          >
+            {item.icon} {item.message}
+          </Button>
+        ))}
       </Box>
 
       {/* Results Card */}
-      <Card sx={{ 
+      <Card id="summary" sx={{ 
         mt: 2, 
         p: 2, 
         backgroundColor: isOnTrack ? '#e8f5e9' : '#ffebee',
@@ -284,7 +343,8 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
         </CardContent>
       </Card>
       
-      <Card sx={{ mt: 4 }}>
+      {/* Graph Card */}
+      <Card id="corpusProjection" sx={{ mt: 4 }}>
         <CardContent>
           <Typography 
             variant="h6"
@@ -317,8 +377,8 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
         </CardContent>
       </Card>
 
-      {/* Updated Table Card */}
-      <Card sx={{ mt: 4 }}>
+      {/* Table Card */}
+      <Card id="detailedReport" sx={{ mt: 4 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography 
@@ -381,8 +441,8 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
         </CardContent>
       </Card>
 
-      {/* New "Buy Me a Coffee" card with updated styling */}
-      <Card sx={{ mt: 4, backgroundColor: '#f5f5f5', color: '#333333' }}>
+      {/* Support Card */}
+      <Card id="support" sx={{ mt: 4, backgroundColor: '#f5f5f5', color: '#333333' }}>
         <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
             <FormattedMessage id="supportDeveloper" />

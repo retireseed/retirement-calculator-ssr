@@ -35,8 +35,11 @@ export default async function handler(req, res) {
         language,
         ipAddress,
         expenses,
-        incomes
+        incomes,
+        channel
       } = req.body;
+
+     
 
       // Insert main calculation data
       const result = await db.run(`
@@ -44,13 +47,13 @@ export default async function handler(req, res) {
           ip_address, current_age, annual_expenses, age_of_retirement, age_of_death,
           estimated_inflation_rate, annual_investment, annual_investment_increment, return_on_investment,
           current_investment_value, surplus_cash, additional_years, peak_corpus,
-          peak_corpus_age, is_on_track, currency, locale, language
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          peak_corpus_age, is_on_track, currency, locale, language,channel
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
       `, [
         ipAddress, currentAge, annualExpenses, ageOfRetirement, ageOfDeath,
         estimatedInflationRate, annualInvestment, annualInvestmentIncrement, returnOnInvestment,
         currentInvestmentValue, surplusCash, additionalYears, peakCorpus,
-        peakCorpusAge, isOnTrack ? 1 : 0, currency, locale, language
+        peakCorpusAge, isOnTrack ? 1 : 0, currency, locale, language,channel
       ]);
 
       // Insert expenses
@@ -78,6 +81,7 @@ export default async function handler(req, res) {
         - Currency: ${currency}
         - Locale: ${locale}
         - Language: ${language}
+        - Channel: ${channel}
         
         Age & Timeline:
         - Current Age: ${currentAge}

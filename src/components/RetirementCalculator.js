@@ -243,8 +243,28 @@ export default function RetirementCalculator() {
     }
   }, [shouldSaveCalculation, results]);
 
+  const detectChannel = () => {
+    // Get the user agent string
+    const userAgent = navigator.userAgent;
+    
+    // Check for tablet first (some tablets report as both mobile and tablet)
+    if (/iPad|Android(?!.*Mobile)|Tablet/i.test(userAgent)) {
+      return 'tablet';
+    }
+    
+    // Check for mobile
+    if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated/i.test(userAgent)) {
+      return 'mobile';
+    }
+    
+    // Default to desktop
+    return 'desktop';
+  };
+
   const saveCalculation = async () => {
     try {
+      const channel = detectChannel();
+      
       const response = await fetch('/api/save-calculation', {
         method: 'POST',
         headers: {
@@ -263,6 +283,7 @@ export default function RetirementCalculator() {
           ipAddress: userIpAddress,
           expenses: calculationData.oneOffExpenses,
           incomes: calculationData.incomes,
+          channel: channel, // Add the channel information
         }),
       });
 
@@ -270,9 +291,6 @@ export default function RetirementCalculator() {
         const errorText = await response.text();
         throw new Error(`Error: ${response.status} - ${errorText}`);
       }
-
-     // const data = await response.json();
-      
     } catch (error) {
       console.error('Error saving calculation:', error.message);
     }
