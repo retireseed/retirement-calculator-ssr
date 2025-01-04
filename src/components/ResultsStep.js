@@ -132,6 +132,70 @@ const GraphComponent = ({ data, currentAge, ageOfRetirement, ageOfDeath, formatC
         </Box>
     );
 };
+
+const calculateScenarios = (results) => {
+  try {
+    const {
+      currentAge,
+      ageOfRetirement,
+      ageOfDeath,
+      annualExpenses,
+      estimatedInflationRate,
+      annualInvestment,
+      returnRate = 0, // Default to 0 if undefined
+      surplusCash,
+      corpusAtRetirement
+    } = results;
+
+    const yearsToRetirement = ageOfRetirement - currentAge;
+    const yearsInRetirement = ageOfDeath - ageOfRetirement;
+    const inflationRate = estimatedInflationRate / 100;
+    const returnRateDecimal = returnRate / 100;
+
+    // 1. Inflation Adjustment for Annual Expenses
+    const inflatedExpenseAtRetirement = annualExpenses * Math.pow(1 + inflationRate, yearsToRetirement);
+
+    // 2. Corpus Required at Retirement
+    let corpusRequired = 0;
+    for (let t = 0; t < yearsInRetirement; t++) {
+      corpusRequired += inflatedExpenseAtRetirement * Math.pow(1 + inflationRate, t) / Math.pow(1 + returnRateDecimal, t);
+    }
+
+    // 3. Additional Corpus Needed
+    const additionalCorpusNeeded = corpusRequired - corpusAtRetirement;
+
+    // 4. Additional Annual Investment
+    const additionalAnnualInvestment = additionalCorpusNeeded * returnRateDecimal / (Math.pow(1 + returnRateDecimal, yearsToRetirement) - 1);
+
+    // Round up the additionalAnnualInvestment to the nearest thousand and make it absolute
+    const roundedAdditionalAnnualInvestment = Math.ceil(Math.abs(additionalAnnualInvestment) / 1000) * 1000;
+
+    // Scenario 2: Required yearly percentage increase
+    const baseMonthlyInvestment = annualInvestment / 12;
+    const targetMonthlyInvestment = (annualInvestment + additionalAnnualInvestment) / 12;
+    const requiredIncrement = baseMonthlyInvestment > 0 ? ((targetMonthlyInvestment / baseMonthlyInvestment) - 1) * 100 : 0;
+
+    // Scenario 3: Additional years needed
+    const currentFV = annualInvestment * ((Math.pow(1 + returnRateDecimal, yearsToRetirement) - 1) / returnRateDecimal);
+    const additionalYears = currentFV > 0 ? Math.ceil(
+      Math.log((currentFV + additionalCorpusNeeded) / currentFV) / Math.log(1 + returnRateDecimal)
+    ) - yearsToRetirement : 0;
+
+    return {
+      additionalAnnualInvestment: roundedAdditionalAnnualInvestment,
+      requiredIncrement: Math.max(0, Math.round(requiredIncrement * 10) / 10),
+      additionalYearsNeeded: Math.max(0, additionalYears)
+    };
+  } catch (error) {
+    console.error('Error in calculateScenarios:', error);
+    return {
+      additionalAnnualInvestment: 5000,
+      requiredIncrement: 10,
+      additionalYearsNeeded: 5
+    };
+  }
+};
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function ResultsStep({ results, formatCurrency, currency, onEdit }) {
   const [openDialog, setOpenDialog] = useState(false);
@@ -145,6 +209,9 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
   }
 
   const { corpusAtRetirement, withdrawalRate, maxWithdrawalRate, surplusCash, additionalYears, isOnTrack, graphData, peakCorpus, peakCorpusAge, currentAge, ageOfRetirement, ageOfDeath, tableData } = results;
+
+  // Calculate scenarios if not on track
+  const scenarios = !isOnTrack ? calculateScenarios(results) : null;
 
   const highlightStyle = {
     fontWeight: 'bold',
@@ -328,16 +395,54 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
                 }}
               />
             ) : (
-              <FormattedMessage
-                id="notOnTrackMessage"
-                values={{
-                  corpusAtRetirement: <HighlightedValue value={formatCurrency(corpusAtRetirement)} />,
-                  initialRate: <HighlightedValue value={withdrawalRate.toFixed(2)} />,
-                  maxRate: <HighlightedValue value={formattedMaxWithdrawalRate} />,
-                  shortfall: <HighlightedValue value={formatCurrency(Math.abs(surplusCash))} />,
-                  yearsShort: <HighlightedValue value={Math.abs(additionalYears)} />,
-                }}
-              />
+              <>
+                <FormattedMessage
+                  id="notOnTrackMessage"
+                  values={{
+                    corpusAtRetirement: <HighlightedValue value={formatCurrency(corpusAtRetirement)} />,
+                    initialRate: <HighlightedValue value={withdrawalRate.toFixed(2)} />,
+                    maxRate: <HighlightedValue value={formattedMaxWithdrawalRate} />,
+                    shortfall: <HighlightedValue value={formatCurrency(Math.abs(surplusCash))} />,
+                    yearsShort: <HighlightedValue value={Math.abs(additionalYears)} />,
+                  }}
+                />
+                <Typography variant="body1" sx={{ mt: 2 }}>
+                  <FormattedMessage
+                    id="suggestedSolutions"
+                    defaultMessage="Here are some ways to achieve your retirement goal:"
+                  />
+                  <ul>
+                    <li>
+                      <FormattedMessage
+                        id="additionalAnnualSolution"
+                        defaultMessage="Increase your current annual investment by {amount} per year"
+                        values={{
+                          amount: <HighlightedValue value={formatCurrency(scenarios.additionalAnnualInvestment)} />
+                        }}
+                      />
+                    </li>
+                    <li>
+                      <FormattedMessage
+                        id="incrementalIncreaseSolution"
+                        defaultMessage="OR increase your monthly investments by {percentage}% each year"
+                        values={{
+                          percentage: <HighlightedValue value={Math.max(scenarios.requiredIncrement, 0).toFixed(1)} />
+                        }}
+                      />
+                    </li>
+                    <li>
+                      <FormattedMessage
+                        id="delayRetirementSolution"
+                        defaultMessage="OR delay your retirement by {years} {yearLabel}"
+                        values={{
+                          years: <HighlightedValue value={scenarios.additionalYearsNeeded} />,
+                          yearLabel: scenarios.additionalYearsNeeded === 1 ? 'year' : 'years'
+                        }}
+                      />
+                    </li>
+                  </ul>
+                </Typography>
+              </>
             )}
           </Typography>
         </CardContent>

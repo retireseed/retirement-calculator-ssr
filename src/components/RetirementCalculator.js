@@ -225,6 +225,9 @@ export default function RetirementCalculator() {
       currentAge: calculationData.currentAge,
       ageOfRetirement: calculationData.ageOfRetirement,
       ageOfDeath: calculationData.ageOfDeath,
+      returnRate: returnOnInvestment,
+      annualExpenses,
+      estimatedInflationRate,
       graphData: data.map(item => ({
         ...item,
         totalCorpus: Math.round(Math.max(0, item.totalCorpus)),
