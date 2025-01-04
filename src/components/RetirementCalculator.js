@@ -214,19 +214,32 @@ export default function RetirementCalculator() {
     }
 
     const calculatedResults = {
-      corpusAtRetirement,
+      corpusAtRetirement: Math.round(corpusAtRetirement),
       withdrawalRate: initialWithdrawalRate,
       maxWithdrawalRate,
-      surplusCash: totalCorpus > 0 ? totalCorpus : -shortfall,
+      surplusCash: Math.round(totalCorpus > 0 ? totalCorpus : -shortfall),
       additionalYears: totalCorpus > 0 ? Math.floor(totalCorpus / finalAdjustedAnnualExpenses) : -yearsShort,
       isOnTrack: totalCorpus > 0,
-      peakCorpus: maxCorpus,
+      peakCorpus: Math.round(maxCorpus),
       peakCorpusAge: maxCorpusAge,
       currentAge: calculationData.currentAge,
       ageOfRetirement: calculationData.ageOfRetirement,
       ageOfDeath: calculationData.ageOfDeath,
-      graphData: data,
-      tableData: data,
+      graphData: data.map(item => ({
+        ...item,
+        totalCorpus: Math.round(Math.max(0, item.totalCorpus)),
+        annualExpenses: Math.round(item.annualExpenses),
+        oneOffExpense: Math.round(item.oneOffExpense || 0),
+        removedExpense: Math.round(item.removedExpense || 0),
+        yearlyIncome: Math.round(item.yearlyIncome),
+        annualInvestment: Math.round(item.annualInvestment)
+      })),
+      tableData: data.map(item => ({
+        ...item,
+        totalCorpus: Math.round(Math.max(0, item.totalCorpus)),
+        annualExpenses: Math.round(item.annualExpenses),
+        annualInvestment: Math.round(item.annualInvestment)
+      })),
       oneOffExpenses: calculationData.oneOffExpenses
     };
 
@@ -272,10 +285,10 @@ export default function RetirementCalculator() {
         },
         body: JSON.stringify({
           ...calculationData,
-          surplusCash: results.surplusCash,
+          surplusCash: Math.round(results.surplusCash),
           additionalYears: results.additionalYears,
           peakCorpusAge: results.peakCorpusAge,
-          peakCorpus: results.peakCorpus,
+          peakCorpus: Math.round(results.peakCorpus),
           isOnTrack: results.isOnTrack,
           currency: currency,
           locale: locale,
@@ -283,7 +296,7 @@ export default function RetirementCalculator() {
           ipAddress: userIpAddress,
           expenses: calculationData.oneOffExpenses,
           incomes: calculationData.incomes,
-          channel: channel, // Add the channel information
+          channel: channel,
         }),
       });
 

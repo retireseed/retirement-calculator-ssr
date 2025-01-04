@@ -184,9 +184,9 @@ export default function ResultsStep({ results, formatCurrency, currency, onEdit 
       headers.join(','),
       ...tableData.map(row => [
         row.year,
-        row.annualInvestment,
-        row.totalCorpus,
-        row.annualExpenses,
+        Math.round(row.annualInvestment),
+        Math.round(row.totalCorpus),
+        Math.round(row.annualExpenses),
         row.withdrawalRate.toFixed(2)
       ].join(','))
     ].join('\n');
